@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @RestController
@@ -41,8 +42,13 @@ public class LogsController {
             Authentication authentication,
             HttpServletRequest httpRequest) {
 
-        logger.info("Searching logs with filters - appIds: {}, levels: {}, from: {}, to: {}, messageContains: {}", 
-                appIds, levels, from, to, messageContains);
+        // Frontend sends UTC timestamps without 'Z' suffix, so we receive them as LocalDateTime
+        // We need to treat these LocalDateTime values as UTC and convert to system timezone for DB queries
+        LocalDateTime fromUtc = from;
+        LocalDateTime toUtc = to;
+        
+        logger.info("Searching logs with filters - appIds: {}, levels: {}, from (UTC): {}, to (UTC): {}, messageContains: {}", 
+                appIds, levels, fromUtc, toUtc, messageContains);
         
         // Validate that only expected parameters are provided
         ParameterCountValidator.validateGetRequest(httpRequest, 
@@ -51,7 +57,7 @@ public class LogsController {
         UserInfo currentUser = authService.getCurrentUser(authentication)
                 .orElseThrow(() -> new AccessDeniedException("User not authenticated"));
 
-        return logService.searchLogs(currentUser.getId(), appIds, levels, messageContains, from, to, pageable);
+        return logService.searchLogs(currentUser.getId(), appIds, levels, messageContains, fromUtc, toUtc, pageable);
     }
 
     @GetMapping("/analysis")

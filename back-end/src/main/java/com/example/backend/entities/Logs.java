@@ -5,6 +5,7 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 
 @Entity
 @Data
@@ -15,6 +16,8 @@ public class Logs {
     @SequenceGenerator(name = "logs_seq", sequenceName = "logs_seq", allocationSize = 50)
     private Long id;
 
+    // Using Timestamp for now (compatible with existing DB)
+    // Hibernate will handle UTC conversion via time_zone: UTC setting
     @Column(name = "timestamp")
     private Timestamp timestamp;
 

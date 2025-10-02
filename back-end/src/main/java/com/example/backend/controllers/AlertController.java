@@ -53,8 +53,11 @@ public class AlertController {
     @PreAuthorize("@authz.isAdmin()")
     @GetMapping
     public Page<AlertInfo> getAlerts(@ValidPageable Pageable pageable, HttpServletRequest httpRequest) {
-        logger.info("Received request to list alerts - page={}, size={}, sort={}", pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
-        // Validate that only page and size parameters are provided
+        logger.info("Received request to list alerts - page={}, size={}, sort={}", 
+            pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
+        logger.info("Query string: {}", httpRequest.getQueryString());
+        
+        // Validate that only page, size, and sort parameters are provided
         ParameterCountValidator.validateGetRequest(httpRequest, "page", "size", "sort");
 
         Page<Alert> page = alertService.getAllAlerts(pageable);

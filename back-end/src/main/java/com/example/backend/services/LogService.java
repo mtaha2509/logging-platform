@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.persistence.criteria.Predicate;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,10 +33,11 @@ public class LogService {
 
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public Page<LogDTO> searchLogs(Long userId, List<Long> appIds, List<String> levels, String message, 
-                                   LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
+                                   LocalDateTime startTimeUtc, LocalDateTime endTimeUtc, Pageable pageable) {
         
         try {
-            log.debug("Searching logs for userId: {}, appIds: {}, levels: {}", userId, appIds, levels);
+            log.info("Searching logs - userId: {}, appIds: {}, levels: {}, startTime (UTC): {}, endTime (UTC): {}, page: {}, size: {}, sort: {}", 
+                userId, appIds, levels, startTimeUtc, endTimeUtc, pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
             
             if (userId == null) {
                 throw new IllegalArgumentException("User ID cannot be null");
@@ -81,17 +85,30 @@ public class LogService {
             if (levels != null && !levels.isEmpty()) {
                 preds.add(root.get("level").in(levels));
             }
-            if (startTime != null) {
-                preds.add(cb.greaterThanOrEqualTo(root.get("timestamp"), Timestamp.valueOf(startTime)));
+            if (startTimeUtc != null) {
+                // Frontend sends UTC timestamps as LocalDateTime (without timezone info)
+                // We need to convert UTC to Timestamp for database comparison
+                // Since Hibernate is configured with time_zone: UTC, it will handle the conversion
+                Instant startInstant = startTimeUtc.toInstant(ZoneOffset.UTC);
+                Timestamp startTimestamp = Timestamp.from(startInstant);
+                log.debug("Converted start time - UTC LocalDateTime: {} -> Instant: {} -> Timestamp: {}", 
+                    startTimeUtc, startInstant, startTimestamp);
+                preds.add(cb.greaterThanOrEqualTo(root.get("timestamp"), startTimestamp));
             }
-            if (endTime != null) {
-                preds.add(cb.lessThanOrEqualTo(root.get("timestamp"), Timestamp.valueOf(endTime)));
+            if (endTimeUtc != null) {
+                // Same conversion for end time
+                Instant endInstant = endTimeUtc.toInstant(ZoneOffset.UTC);
+                Timestamp endTimestamp = Timestamp.from(endInstant);
+                log.debug("Converted end time - UTC LocalDateTime: {} -> Instant: {} -> Timestamp: {}", 
+                    endTimeUtc, endInstant, endTimestamp);
+                preds.add(cb.lessThanOrEqualTo(root.get("timestamp"), endTimestamp));
             }
             if (message != null && !message.isBlank()) {
                     preds.add(cb.like(root.get("message"), "%" + message + "%"));
             }
 
-                query.orderBy(cb.desc(root.get("timestamp")));
+                // Don't add orderBy here - let Pageable handle sorting
+                // This allows frontend to control sort direction
                 return cb.and(preds.toArray(new Predicate[0]));
             };
             

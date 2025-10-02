@@ -1,13 +1,19 @@
 package com.example.backend.validation;
 
+import com.example.backend.config.PaginationConfig;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 
 /**
  * Validator for Pageable parameters to ensure page and size are valid.
+ * Uses centralized pagination configuration from PaginationConfig.
  */
 public class PageableValidator implements ConstraintValidator<ValidPageable, Pageable> {
+
+    @Autowired(required = false)
+    private PaginationConfig paginationConfig;
 
     private int maxPage;
     private int maxSize;
@@ -16,7 +22,8 @@ public class PageableValidator implements ConstraintValidator<ValidPageable, Pag
     @Override
     public void initialize(ValidPageable constraintAnnotation) {
         this.maxPage = constraintAnnotation.maxPage();
-        this.maxSize = constraintAnnotation.maxSize();
+        // Use centralized config if available, otherwise use annotation defaults
+        this.maxSize = (paginationConfig != null) ? paginationConfig.getMaxPageSize() : constraintAnnotation.maxSize();
         this.minSize = constraintAnnotation.minSize();
     }
 

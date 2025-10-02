@@ -35,7 +35,9 @@ public class AlertService {
 
     @PreAuthorize("@authz.isAdmin()")
     public Page<Alert> getAllAlerts(Pageable pageable) {
-        return alertRepository.findAllByOrderByUpdatedAtDesc(pageable);
+        // Use findAll to respect the sort parameter from Pageable
+        // If no sort specified, default to updatedAt desc is handled by frontend
+        return alertRepository.findAll(pageable);
     }
 
 

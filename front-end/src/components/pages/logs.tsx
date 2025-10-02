@@ -7,6 +7,8 @@ import { apiClient, Log as ApiLog, LogSearchParams, PaginatedResponse, Applicati
 import { errorHandler } from "../../services/errorHandler";
 import { useToast } from "../../contexts/ToastContext";
 import { HttpApiError } from "../../services/HttpApiError";
+import { Pagination } from "../common/Pagination";
+import { SortButton } from "../common/SortButton";
 import "ojs/ojinputtext";
 import "ojs/ojlabel";
 import "ojs/ojbutton";
@@ -167,6 +169,7 @@ export function LogsPage() {
     totalElements: 0,
     totalPages: 0
   });
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Toast notifications
@@ -197,43 +200,43 @@ export function LogsPage() {
     }
   };
 
-  // Convert time range to LocalDateTime format (without timezone)
+  // Convert time range - work with UTC timestamps throughout
   const getTimeRangeDates = (relative: string) => {
-    const now = new Date();
-    const from = new Date();
+    // Get current time as UTC timestamp (milliseconds since epoch)
+    const nowMs = Date.now();
+    let fromMs: number;
     
     switch (relative) {
       case 'last_hour':
-        from.setTime(now.getTime() - (60 * 60 * 1000)); // 1 hour in milliseconds
+        fromMs = nowMs - (60 * 60 * 1000);
         break;
       case 'last_24_hours':
-        from.setTime(now.getTime() - (24 * 60 * 60 * 1000)); // 24 hours in milliseconds
+        fromMs = nowMs - (24 * 60 * 60 * 1000);
         break;
       case 'last_7_days':
-        from.setTime(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days in milliseconds
+        fromMs = nowMs - (7 * 24 * 60 * 60 * 1000);
         break;
       case 'last_30_days':
-        from.setTime(now.getTime() - (30 * 24 * 60 * 60 * 1000)); // 30 days in milliseconds
+        fromMs = nowMs - (30 * 24 * 60 * 60 * 1000);
         break;
       default:
-        from.setTime(now.getTime() - (60 * 60 * 1000)); // Default to 1 hour
+        fromMs = nowMs - (60 * 60 * 1000);
     }
     
-    // Convert to LocalDateTime format (YYYY-MM-DDTHH:mm:ss) without timezone
-    const formatLocalDateTime = (date: Date) => {
-      // Use local time formatting to avoid timezone conversion issues
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const seconds = String(date.getSeconds()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+    // Format milliseconds to ISO string and remove timezone suffix
+    const formatTimestamp = (ms: number) => {
+      const date = new Date(ms);
+      return date.toISOString().slice(0, 19); // "2025-10-02T06:07:14"
     };
     
+    const fromStr = formatTimestamp(fromMs);
+    const toStr = formatTimestamp(nowMs);
+    
+    console.log(`📅 Time range: ${relative} -> From: ${fromStr} To: ${toStr} (UTC)`);
+    
     return {
-      from: formatLocalDateTime(from),
-      to: formatLocalDateTime(now)
+      from: fromStr,
+      to: toStr
     };
   };
 
@@ -247,25 +250,20 @@ export function LogsPage() {
       let fromDate: string | undefined;
       let toDate: string | undefined;
       
-      const formatLocalDateTime = (date: Date) => {
-        // Force local time formatting without timezone conversion
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      const formatToUTC = (date: Date) => {
+        // User selects date in their local timezone
+        // Convert to UTC by using toISOString() and removing 'Z'
+        return date.toISOString().slice(0, 19);
       };
       
       // Check if any custom dates are set
       if (filters.timeRange.from || filters.timeRange.to) {
         // Use custom dates (individual or both)
         if (filters.timeRange.from) {
-          fromDate = formatLocalDateTime(filters.timeRange.from);
+          fromDate = formatToUTC(filters.timeRange.from);
         }
         if (filters.timeRange.to) {
-          toDate = formatLocalDateTime(filters.timeRange.to);
+          toDate = formatToUTC(filters.timeRange.to);
         }
       } else if (filters.timeRange.relative) {
         // Use relative time range only if no custom dates are set
@@ -279,7 +277,8 @@ export function LogsPage() {
         page,
         size: pagination.size,
         from: fromDate,
-        to: toDate
+        to: toDate,
+        sort: `timestamp,${sortOrder}`
       };
       
       // Add multi-select filters
@@ -359,6 +358,19 @@ export function LogsPage() {
     }
   };
 
+  // Handlers for pagination and sorting
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPagination(prev => ({ ...prev, size: newSize, page: 0 }));
+  };
+
+  const handleSortChange = (newSort: 'asc' | 'desc') => {
+    setSortOrder(newSort);
+  };
+
   useEffect(() => {
     const initializeLogs = async () => {
       try {
@@ -420,6 +432,18 @@ export function LogsPage() {
       handleSearch(0);
     }
   }, [isInitialized]);
+
+  // Trigger search when pagination or sort changes
+  useEffect(() => {
+    if (isInitialized) {
+      console.log('🔄 Pagination/Sort changed - triggering search:', { 
+        page: pagination.page, 
+        size: pagination.size, 
+        sort: sortOrder 
+      });
+      handleSearch(pagination.page);
+    }
+  }, [pagination.page, pagination.size, sortOrder]);
 
   // Data provider for table
   const dataProvider = useMemo(() => {
@@ -722,6 +746,11 @@ export function LogsPage() {
           <h3 class="oj-typography-heading-sm table-title-logs">
             Results {pagination.totalElements > 0 && `(${pagination.totalElements} total)`}
           </h3>
+          <SortButton
+            label="Sort by Time"
+            currentSort={sortOrder}
+            onSortChange={handleSortChange}
+          />
         </div>
 
         {isLoading ? (
@@ -752,43 +781,17 @@ export function LogsPage() {
           </>
         )}
         
-        {/* Simple Pagination */}
-        {logs.length > 0 && pagination.totalPages > 1 && (
-          <div class="pagination-container-logs">
-            <div class="oj-flex oj-sm-justify-content-space-between oj-sm-align-items-center pagination-wrapper-logs">
-              {/* Results Info */}
-              <div class="pagination-info-logs">
-                <span class="oj-typography-body-sm oj-text-color-secondary">
-                  {pagination.totalElements} results • Page {pagination.page + 1} of {pagination.totalPages}
-                </span>
-              </div>
-
-              {/* Simple Navigation */}
-              <div class="oj-flex oj-sm-align-items-center pagination-controls-logs">
-            <oj-button 
-              chroming="outlined"
-              onojAction={() => handleSearch(pagination.page - 1)}
-              disabled={pagination.page === 0 || isLoading}
-                  title="Previous page"
-                  class="pagination-btn-logs"
-            >
-                  <span slot="startIcon" class="oj-ux-ico-previous"></span>
-              Previous
-            </oj-button>
-
-            <oj-button 
-              chroming="outlined"
-              onojAction={() => handleSearch(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages - 1 || isLoading}
-                  title="Next page"
-                  class="pagination-btn-logs"
-            >
-              Next
-                  <span slot="endIcon" class="oj-ux-ico-next"></span>
-            </oj-button>
-              </div>
-            </div>
-          </div>
+        {/* Advanced Pagination */}
+        {logs.length > 0 && (
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.size}
+            totalElements={pagination.totalElements}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         )}
       </div>
     </div>

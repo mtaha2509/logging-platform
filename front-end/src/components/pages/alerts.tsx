@@ -8,6 +8,8 @@ import { authService } from '../../services/auth';
 import { errorHandler } from '../../services/errorHandler';
 import { useToast } from '../../contexts/ToastContext';
 import { validateCreateAlert, validateUpdateAlert } from '../../utils/validation';
+import { Pagination } from '../common/Pagination';
+import { SortButton } from '../common/SortButton';
 import 'ojs/ojbutton';
 import 'ojs/ojlabel';
 import 'ojs/ojinputtext';
@@ -46,9 +48,10 @@ export function AlertsPage({}: AlertsPageProps) {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   const { showSuccess, showError } = useToast();
   const dialogRef = useRef<any>(null);
@@ -253,7 +256,7 @@ export function AlertsPage({}: AlertsPageProps) {
   const loadAlerts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getAllAlerts(currentPage, pageSize);
+      const response = await apiClient.getAllAlerts(currentPage, pageSize, sortOrder);
       setAlerts(response.content);
       setTotalPages(response.totalPages);
       setTotalElements(response.totalElements);
@@ -310,19 +313,43 @@ export function AlertsPage({}: AlertsPageProps) {
     }
   };
 
+  // helper: convert seconds -> PT string (common mappings)
+const secondsToPT = (secs: number) => {
+  const map: Record<number, string> = {
+    30: 'PT30S',
+    60: 'PT1M',
+    300: 'PT5M',
+    900: 'PT15M',
+    1800: 'PT30M',
+    3600: 'PT1H',
+    7200: 'PT2H',
+    21600: 'PT6H',
+    43200: 'PT12H',
+    86400: 'PT24H'
+  };
+  return map[secs] ?? `PT${secs}S`;
+};
+
+const normalizeTimeWindow = (tw: any) => {
+  if (tw === undefined || tw === null || tw === '') return 'PT5M'; // default
+  if (typeof tw === 'number') return secondsToPT(tw);
+  return tw; // assume already a string like 'PT5M'
+};
+
   // Edit alert
   const handleEditAlert = (alert: Alert) => {
-    setSelectedAlert(alert);
-    setEditFormData({
-      applicationId: alert.applicationId || 0,
-      severityLevel: alert.level,
-      count: alert.count,
-      timeWindow: alert.timeWindow,
-      isActive: alert.isActive !== false // Default to true if undefined
-    });
-    setEditFormErrors({});
-    setShowEditDialog(true);
-  };
+  setSelectedAlert(alert);
+  setEditFormData({
+    applicationId: alert.applicationId || 0,
+    severityLevel: alert.level,
+    count: alert.count,
+    timeWindow: normalizeTimeWindow(alert.timeWindow), // <- normalized here
+    isActive: alert.isActive !== false // Default to true if undefined
+  });
+  setEditFormErrors({});
+  setShowEditDialog(true);
+};
+
 
   const handleUpdateAlert = async () => {
     try {
@@ -382,10 +409,27 @@ export function AlertsPage({}: AlertsPageProps) {
     loadAlerts();
   }, []);
 
-  // Reload alerts when page changes
+  // Handlers for pagination and sorting
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(0); // Reset to first page when size changes
+  };
+
+  const handleSortChange = (newSort: 'asc' | 'desc') => {
+    setSortOrder(newSort);
+    setCurrentPage(0); // Reset to first page when sort changes
+  };
+
+  // Reload alerts when page, size, or sort changes
   useEffect(() => {
-    loadAlerts();
-  }, [currentPage, pageSize]);
+    if (applications.length > 0) { // Only load after applications are loaded
+      loadAlerts();
+    }
+  }, [currentPage, pageSize, sortOrder]);
 
   // Control dialog visibility
   useEffect(() => {
@@ -445,9 +489,16 @@ export function AlertsPage({}: AlertsPageProps) {
           </div>
         ) : (
           <>
-            <h3 class="oj-typography-heading-sm table-title-alerts oj-sm-margin-3x-bottom">
-              Active Alerts ({totalElements})
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 class="oj-typography-heading-sm table-title-alerts">
+                Active Alerts ({totalElements})
+              </h3>
+              <SortButton
+                label="Sort by Updated"
+                currentSort={sortOrder}
+                onSortChange={handleSortChange}
+              />
+            </div>
             
             
             <oj-table
@@ -461,48 +512,18 @@ export function AlertsPage({}: AlertsPageProps) {
               style={{ width: '100%', minHeight: '600px' }}
             />
             
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div class="pagination-container">
-                <div class="pagination-info">
-                  <span>Page {currentPage + 1} of {totalPages} ({totalElements} total alerts)</span>
-                </div>
-                <div class="pagination-controls">
-                  <oj-button
-                    class="pagination-btn"
-                    onojAction={() => setCurrentPage(0)}
-                    disabled={currentPage === 0 || loading}
-                  >
-                    <span slot="startIcon" class="oj-ux-ico-arrow-left"></span>
-                    First
-                  </oj-button>
-                  <oj-button
-                    class="pagination-btn"
-                    onojAction={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-                    disabled={currentPage === 0 || loading}
-                  >
-                    <span slot="startIcon" class="oj-ux-ico-arrow-left"></span>
-                    Previous
-                  </oj-button>
-                  <oj-button
-                    class="pagination-btn"
-                    onojAction={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-                    disabled={currentPage === totalPages - 1 || loading}
-                  >
-                    Next
-                    <span slot="endIcon" class="oj-ux-ico-arrow-right"></span>
-                  </oj-button>
-                  <oj-button
-                    class="pagination-btn"
-                    onojAction={() => setCurrentPage(totalPages - 1)}
-                    disabled={currentPage === totalPages - 1 || loading}
-                  >
-                    Last
-                    <span slot="endIcon" class="oj-ux-ico-arrow-right"></span>
-                  </oj-button>
-                      </div>
-                        </div>
-                      )}
+            {/* Advanced Pagination */}
+            {totalElements > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalElements={totalElements}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                pageSizeOptions={[10, 20, 50, 100]}
+              />
+            )}
           </>
         )}
       </div>

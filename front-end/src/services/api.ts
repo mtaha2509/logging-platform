@@ -91,6 +91,7 @@ export interface LogSearchParams {
   messageContains?: string;
   page?: number;
   size?: number;
+  sort?: string;
 }
 
 export interface CreateApplicationRequest {
@@ -203,9 +204,9 @@ class ApiClient {
     });
   }
 
-  // Admin-only: Get all alerts with pagination
-  async getAllAlerts(page: number, size: number): Promise<PaginatedResponse<Alert>> {
-    return this.makeRequest<PaginatedResponse<Alert>>(`/alerts?page=${page}&size=${size}`);
+  // Admin-only: Get all alerts with pagination and sorting
+  async getAllAlerts(page: number, size: number, sort: 'asc' | 'desc' = 'desc'): Promise<PaginatedResponse<Alert>> {
+    return this.makeRequest<PaginatedResponse<Alert>>(`/alerts?page=${page}&size=${size}&sort=updatedAt,${sort}`);
   }
 
   async getUserApplications(userId: number): Promise<Application[]> {
@@ -277,6 +278,7 @@ class ApiClient {
     if (params.messageContains) queryParams.append('messageContains', params.messageContains);
     if (params.page !== undefined) queryParams.append('page', params.page.toString());
     if (params.size !== undefined) queryParams.append('size', params.size.toString());
+    if (params.sort) queryParams.append('sort', params.sort);
 
     const url = `/logs?${queryParams}`;
     console.log('🌐 API Call: GET', url);

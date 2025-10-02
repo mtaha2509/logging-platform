@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,22 +58,59 @@ public class LogConsumer {
 
                 Timestamp ts;
                 if (tsStr != null && !tsStr.isEmpty()) {
-                    // Try known patterns
-                    Timestamp tmp;
+                    // Parse timestamp and always convert to UTC
+                    Instant instant;
                     try {
-                        LocalDateTime ldt = LocalDateTime.parse(tsStr, formatterWithMillis);
-                        tmp = Timestamp.valueOf(ldt);
-                    } catch (Exception ex1) {
+                        // Try parsing as numeric timestamp (Unix epoch in seconds or milliseconds)
+                        // Handles: "1759403487567", "1.759403487567E9", "1759403487.567"
+                        double numericTimestamp = Double.parseDouble(tsStr);
+                        
+                        // Determine if it's seconds or milliseconds
+                        // Timestamps > 10 billion are in milliseconds
+                        if (numericTimestamp > 10_000_000_000L) {
+                            // Milliseconds since epoch
+                            instant = Instant.ofEpochMilli((long) numericTimestamp);
+                        } else {
+                            // Seconds since epoch (with possible decimal for milliseconds)
+                            long seconds = (long) numericTimestamp;
+                            long nanos = (long) ((numericTimestamp - seconds) * 1_000_000_000);
+                            instant = Instant.ofEpochSecond(seconds, nanos);
+                        }
+                        log.debug("Parsed numeric timestamp: {} -> UTC: {}", tsStr, instant);
+                    } catch (NumberFormatException numEx) {
+                        // Not a number, try other formats
                         try {
-                            Instant inst = Instant.parse(tsStr); // ISO fallback
-                            tmp = Timestamp.from(inst);
-                        } catch (Exception ex2) {
-                            tmp = new Timestamp(System.currentTimeMillis());
+                            // Try ISO-8601 format (e.g., "2025-10-02T10:00:00Z" or with offset)
+                            instant = Instant.parse(tsStr);
+                            log.debug("Parsed ISO-8601 timestamp: {} -> UTC: {}", tsStr, instant);
+                        } catch (Exception ex1) {
+                            try {
+                                // Try parsing as ZonedDateTime (handles timezone info like +05:00)
+                                ZonedDateTime zdt = ZonedDateTime.parse(tsStr);
+                                instant = zdt.toInstant(); // Converts to UTC
+                                log.debug("Parsed ZonedDateTime: {} -> UTC: {}", tsStr, instant);
+                            } catch (Exception ex2) {
+                                try {
+                                    // Try with milliseconds format (e.g., "2025-10-02 10:00:00,123")
+                                    LocalDateTime ldt = LocalDateTime.parse(tsStr, formatterWithMillis);
+                                    // IMPORTANT: Assume input is in LOCAL timezone (UTC+5 for Pakistan)
+                                    // Convert from local to UTC by subtracting offset
+                                    instant = ldt.atZone(java.time.ZoneId.systemDefault()).toInstant();
+                                    log.debug("Parsed LocalDateTime: {} (system timezone) -> UTC: {}", tsStr, instant);
+                                } catch (Exception ex3) {
+                                    // Fallback to current time in UTC
+                                    log.warn("Could not parse timestamp '{}', using current time. Error: {}", tsStr, ex3.getMessage());
+                                    instant = Instant.now();
+                                }
+                            }
                         }
                     }
-                    ts = tmp;
+                    // Convert Instant (always UTC) to Timestamp
+                    ts = Timestamp.from(instant);
+                    log.debug("Final timestamp to store: {}", ts);
                 } else {
-                    ts = new Timestamp(System.currentTimeMillis());
+                    // No timestamp provided, use current time in UTC
+                    ts = Timestamp.from(Instant.now());
                 }
 
                 // Level and message (safe fallbacks)
