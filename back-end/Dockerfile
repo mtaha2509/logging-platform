@@ -1,26 +1,30 @@
-# Build stage with Java 21 (latest available)
+# Build stage
 FROM maven:3.9.5-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
-# Copy Maven files first for better caching
 COPY pom.xml .
 COPY src ./src
 
-# Build the application with Java 21
 RUN mvn clean package -DskipTests
 
-# Runtime stage with Java 21
+# Runtime stage
 FROM eclipse-temurin:21-jre-jammy
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
 WORKDIR /app
 
 # Copy JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Create logs directory
-RUN mkdir -p logs
+# Create logs directory and set permissions
+RUN mkdir -p logs && chown -R appuser:appuser /app
 
-# Expose port
+# Switch to non-root user
+USER appuser
+
 EXPOSE 8080
 
-# Run the application
 CMD ["java", "-jar", "app.jar"]
+

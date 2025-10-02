@@ -83,15 +83,24 @@ export interface PaginatedResponse<T> {
   last: boolean;
 }
 
+/**
+ * Log search parameters with RESTful semantics.
+ * Arrays are sent as comma-separated values for OR logic.
+ * Different parameters are combined with AND logic.
+ * 
+ * Example: appIds=[4,20], levels=['ERROR','WARNING']
+ * Generates: ?appIds=4,20&levels=ERROR,WARNING
+ * Semantic: (app 4 OR app 20) AND (ERROR OR WARNING)
+ */
 export interface LogSearchParams {
-  appIds?: number[];
-  levels?: string[];
-  from?: string;
-  to?: string;
-  messageContains?: string;
-  page?: number;
-  size?: number;
-  sort?: string;
+  appIds?: number[];        // OR logic: [4,20] → ?appIds=4,20
+  levels?: string[];        // OR logic: ['ERROR','WARNING'] → ?levels=ERROR,WARNING
+  from?: string;            // UTC timestamp: 2025-10-01T00:00:00
+  to?: string;              // UTC timestamp: 2025-10-02T23:59:59
+  messageContains?: string; // Partial match on log message
+  page?: number;            // Zero-indexed page number
+  size?: number;            // Page size (default: 20)
+  sort?: string;            // Format: field,direction (e.g., "timestamp,desc")
 }
 
 export interface CreateApplicationRequest {
@@ -124,9 +133,20 @@ export interface CreateAlertRequest {
   timeWindow: string;
 }
 
+/**
+ * Bulk permission request for POST/DELETE operations.
+ * Creates/removes cartesian product of users × applications.
+ * Uses JSON body (not query params) because:
+ * 1. Modifying state (not just querying)
+ * 2. Potentially large arrays
+ * 3. More semantic for bulk operations
+ * 
+ * Example: userIds=[1,2], appIds=[10,20]
+ * Creates/removes: (1→10, 1→20, 2→10, 2→20) = 4 permissions
+ */
 export interface BulkPermissionRequest {
-  userIds: number[];
-  appIds: number[];
+  userIds: number[];  // Users to grant/revoke access
+  appIds: number[];   // Applications to grant/revoke access to
 }
 
 // ApiError interface moved to HttpApiError.ts
@@ -263,14 +283,16 @@ class ApiClient {
   async searchLogs(params: LogSearchParams): Promise<PaginatedResponse<Log>> {
     const queryParams = new URLSearchParams();
     
-    // Handle multiple app IDs
+    // Handle multiple app IDs - Use comma-separated for OR logic
+    // Example: ?appIds=4,20 means (app 4 OR app 20)
     if (params.appIds && params.appIds.length > 0) {
-      params.appIds.forEach(appId => queryParams.append('appIds', appId.toString()));
+      queryParams.append('appIds', params.appIds.join(','));
     }
     
-    // Handle multiple levels
+    // Handle multiple levels - Use comma-separated for OR logic
+    // Example: ?levels=ERROR,WARNING means (ERROR OR WARNING)
     if (params.levels && params.levels.length > 0) {
-      params.levels.forEach(level => queryParams.append('levels', level));
+      queryParams.append('levels', params.levels.join(','));
     }
     
     if (params.from) queryParams.append('from', params.from);

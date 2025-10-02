@@ -1,6 +1,7 @@
 services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v25.2.1
+    container_name: logging-redpanda
     command:
       - redpanda start
       - --smp 1
@@ -14,30 +15,80 @@ services:
       - "19092:19092"
     volumes:
       - redpanda-data:/var/lib/redpanda/data
+    networks:
+      - logging-network
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
 
   console:
     image: docker.redpanda.com/redpandadata/console:v3.1.3
+    container_name: logging-console
     ports:
       - "8083:8080"
     environment:
       KAFKA_BROKERS: redpanda:9092
+    networks:
+      - logging-network
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
 
   fluent-bit:
     image: fluent/fluent-bit:1.9
+    container_name: logging-fluent-bit
     ports:
       - "24224:24224"
     volumes:
-      - ./fluent-bit-config/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
-      - ./fluent-bit-config/parsers.conf:/fluent-bit/etc/parsers.conf
-      - /tmp/app-logs:/var/logs
+      - ./fluent-bit-config/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit-config/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - /tmp/app-logs:/var/logs:ro
       - ./fluent-bit-data:/fluent-bit/db
+    networks:
+      - logging-network
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ps aux | grep fluent-bit | grep -v grep"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
 
   backend:
-    build: ./back-end
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile
+    container_name: logging-backend
     ports:
       - "8080:8080"
     extra_hosts:
@@ -45,31 +96,66 @@ services:
     env_file:
       - ./back-end/.env
     environment:
-      # Override specific values for Docker environment
       SPRING_PROFILES_ACTIVE: dev
       DB_HOST: host.docker.internal
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
-      # Ensure logs directory is accessible
       LOG_FILE_PATH: logs/app.log
     volumes:
-      # Mount logs directory for persistence
       - ./back-end/logs:/app/logs
+    networks:
+      - logging-network
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
 
   frontend:
-    build: ./front-end
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+    container_name: logging-frontend
     ports:
       - "8000:8000"
     environment:
       NODE_ENV: development
+    networks:
+      - logging-network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
 
 networks:
   logging-network:
     driver: bridge
+    name: logging-network
 
 volumes:
   redpanda-data:
+    name: logging-redpanda-data
 

@@ -77,11 +77,15 @@ public class LogService {
                     }
                 } else {
                     // For admin users, allow access to all applications
+                    // Application filter: IN clause provides OR logic
+                    // Example: appIds=[4, 20] → WHERE application_id IN (4, 20)
                     if (appIds != null && !appIds.isEmpty()) {
                         preds.add(root.get("application").get("id").in(appIds));
                     }
                     // If appIds is null or empty, admin can see logs from all applications (no filtering)
                 }
+            // Level filter: IN clause provides OR logic
+            // Example: levels=[ERROR, WARNING] → WHERE level IN ('ERROR', 'WARNING')
             if (levels != null && !levels.isEmpty()) {
                 preds.add(root.get("level").in(levels));
             }

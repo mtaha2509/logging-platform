@@ -31,6 +31,24 @@ public class LogsController {
     private final LogService logService;
     private final AuthService authService;
 
+    /**
+     * Search logs with multiple filters (all filters use AND logic, except within same filter which uses OR).
+     * 
+     * Query parameter semantics:
+     * - appIds: Comma-separated for OR → ?appIds=4,20 means (app 4 OR app 20)
+     * - levels: Comma-separated for OR → ?levels=ERROR,WARNING means (ERROR OR WARNING)
+     * - Multiple different filters combined with AND
+     * 
+     * Example: ?appIds=4,20&levels=ERROR,WARNING&from=2025-10-01T00:00:00
+     * Semantic: (app 4 OR app 20) AND (ERROR OR WARNING) AND (after Oct 1)
+     * 
+     * @param appIds Filter by application IDs (OR logic if multiple)
+     * @param levels Filter by log levels (OR logic if multiple)
+     * @param from Filter logs after this timestamp (UTC)
+     * @param to Filter logs before this timestamp (UTC)
+     * @param messageContains Filter by message content (partial match)
+     * @param pageable Pagination and sorting parameters
+     */
     @GetMapping
     public Page<LogDTO> searchLogs(
             @RequestParam(required = false) List<Long> appIds,
@@ -60,6 +78,18 @@ public class LogsController {
         return logService.searchLogs(currentUser.getId(), appIds, levels, messageContains, fromUtc, toUtc, pageable);
     }
 
+    /**
+     * Get log analysis (trends or summary) for specified applications and time period.
+     * 
+     * Query parameter semantics:
+     * - appIds: Comma-separated for OR → ?appIds=4,20 means (app 4 OR app 20)
+     * - If admin and appIds not provided: analyzes ALL applications
+     * - If regular user: must provide appIds (filtered to only assigned apps)
+     * 
+     * @param view Either "trends" (time-series data) or "summary" (aggregated counts)
+     * @param period Time range: last_hour, last_24_hours, last_7_days, last_30_days
+     * @param appIds Filter by application IDs (OR logic if multiple)
+     */
     @GetMapping("/analysis")
     public ResponseEntity<?> getLogAnalysis(
             @RequestParam String view,

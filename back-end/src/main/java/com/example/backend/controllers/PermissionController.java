@@ -27,6 +27,14 @@ public class PermissionController {
     private final PermissionService permissionService;
     private final AuthService authService;
 
+    /**
+     * Bulk assign permissions - creates cartesian product of users × applications.
+     * Example: userIds=[1,2] + appIds=[10,20] = creates 4 permissions
+     * Uses POST with JSON body (not query params) because:
+     * 1. Modifying state (creating permissions)
+     * 2. Potentially large arrays that exceed URL length limits
+     * 3. Arrays in body are more semantic for bulk operations
+     */
     @PostMapping
     public List<Permission> createPermissions(@Valid @RequestBody AssignPermissionRequest request, Authentication authentication, HttpServletRequest httpRequest) {
         logger.info("Assigning permissions for {} users to {} applications", request.getUserIds().size(), request.getAppIds().size());
@@ -51,6 +59,14 @@ public class PermissionController {
         return permissions;
     }
     
+    /**
+     * Bulk revoke permissions - removes cartesian product of users × applications.
+     * Example: userIds=[1,2] + appIds=[10,20] = removes 4 permissions
+     * Uses DELETE with JSON body (not query params) because:
+     * 1. Modifying state (deleting permissions)
+     * 2. DELETE with body is acceptable for bulk operations per REST guidelines
+     * 3. More semantic than encoding arrays in URL
+     */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePermissions(@Valid @RequestBody BulkRevokeRequest request, Authentication authentication, HttpServletRequest httpRequest) {
