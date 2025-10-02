@@ -1,0 +1,70 @@
+# ========================================
+# LOGGING PLATFORM - BASE CONFIGURATION
+# ========================================
+# This file contains base configuration that applies to all environments
+# Environment-specific configurations are in application-{profile}.yml
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: ${APP_NAME}
+    version: ${APP_VERSION}
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+
+  # Database Configuration (using environment variables)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  # Security Configuration (using environment variables)
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+            user-name-attribute: email
+
+  # Kafka Configuration (using environment variables)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    listener:
+      type: batch
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:log-consumer-group}
+      auto-offset-reset: ${KAFKA_AUTO_OFFSET_RESET:earliest}
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
+      fetch-min-size: ${KAFKA_FETCH_MIN_SIZE:1MB}
+      fetch-max-wait: ${KAFKA_FETCH_MAX_WAIT:5000}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  # JPA Configuration
+
+
+# Company Configuration
+company:
+  admin: ${COMPANY_ADMIN_EMAIL}
+
+# Frontend Configuration
+frontend:
+  url: ${FRONTEND_URL}
+
+

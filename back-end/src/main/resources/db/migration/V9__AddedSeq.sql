@@ -1,0 +1,1 @@
+create sequence "logging-platform".logs_seq start 1 increment 1;

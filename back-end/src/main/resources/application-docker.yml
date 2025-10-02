@@ -1,0 +1,46 @@
+# Docker profile configuration
+spring:
+  # Database Configuration for Docker
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:${HOST:host.docker.internal}}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  # JPA Configuration for Docker
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        "default_schema": ${DB_SCHEMA:logging-platform}
+        jdbc:
+          "batch_size": ${JPA_BATCH_SIZE:100}
+        "order_inserts": true
+        "order_updates": true
+        "format_sql": false
+    "show-sql": false
+
+  # Kafka Configuration for Docker
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:redpanda:9092}
+    listener:
+      type: batch
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:log-consumer-group}
+      auto-offset-reset: ${KAFKA_AUTO_OFFSET_RESET:earliest}
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
+      fetch-min-size: ${KAFKA_FETCH_MIN_SIZE:1MB}
+      fetch-max-wait: ${KAFKA_FETCH_MAX_WAIT:5000}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Logging Configuration for Docker
+logging:
+  level:
+    root: INFO
+    com.example.backend: DEBUG
+
+# Frontend URL for Docker
+frontend:
+  url: ${FRONTEND_URL:http://localhost:8000}

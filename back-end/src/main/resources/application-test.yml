@@ -1,0 +1,27 @@
+# ========================================
+# TEST ENVIRONMENT CONFIGURATION
+# ========================================
+
+spring:
+  # Test-specific database (if needed)
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+# Test logging (reduced verbosity)
+logging:
+  level:
+    root: WARN
+    com.example.backend: INFO
+    
+# Test server
+server:
+  port: 0  # Random port for tests
+

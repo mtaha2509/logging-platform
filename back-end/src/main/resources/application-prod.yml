@@ -1,0 +1,28 @@
+# ========================================
+# PRODUCTION ENVIRONMENT CONFIGURATION
+# ========================================
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Never modify schema in production
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# Production logging (minimal)
+logging:
+  level:
+    root: WARN
+    com.example.backend: INFO
+
+# Production server settings
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true   # HTTPS only in production
+        http-only: true
+        same-site: strict
+

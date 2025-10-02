@@ -1,0 +1,75 @@
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.2.1
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+
+  console:
+    image: docker.redpanda.com/redpandadata/console:v3.1.3
+    ports:
+      - "8083:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - redpanda
+
+  fluent-bit:
+    image: fluent/fluent-bit:1.9
+    ports:
+      - "24224:24224"
+    volumes:
+      - ./fluent-bit-config/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./fluent-bit-config/parsers.conf:/fluent-bit/etc/parsers.conf
+      - /tmp/app-logs:/var/logs
+      - ./fluent-bit-data:/fluent-bit/db
+    depends_on:
+      - redpanda
+
+  backend:
+    build: ./back-end
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./back-end/.env
+    environment:
+      # Override specific values for Docker environment
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: host.docker.internal
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      # Ensure logs directory is accessible
+      LOG_FILE_PATH: logs/app.log
+    volumes:
+      # Mount logs directory for persistence
+      - ./back-end/logs:/app/logs
+    depends_on:
+      - redpanda
+
+  frontend:
+    build: ./front-end
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+    depends_on:
+      - backend
+
+networks:
+  logging-network:
+    driver: bridge
+
+volumes:
+  redpanda-data:
+

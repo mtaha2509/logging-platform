@@ -1,0 +1,72 @@
+/* Validation Styles */
+
+.field-hint {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.field-error {
+  color: #d32f2f;
+  font-size: 0.875em;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-error::before {
+  content: "⚠";
+  font-size: 1.1em;
+}
+
+.field-success {
+  color: #388e3c;
+  font-size: 0.875em;
+  margin-top: 4px;
+}
+
+.field-warning {
+  color: #f57c00;
+  font-size: 0.875em;
+  margin-top: 4px;
+}
+
+/* Character counter colors */
+.char-count-ok {
+  color: #666;
+}
+
+.char-count-warning {
+  color: #f57c00;
+}
+
+.char-count-danger {
+  color: #d32f2f;
+  font-weight: 500;
+}
+
+/* Form field spacing */
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-field:last-child {
+  margin-bottom: 0;
+}
+
+/* Input validation states */
+.oj-inputtext-input:invalid {
+  border-color: #d32f2f;
+}
+
+.oj-inputtext-input:valid {
+  border-color: #388e3c;
+}
+
+/* Required field indicator */
+.required-indicator {
+  color: #d32f2f;
+  margin-left: 2px;
+}

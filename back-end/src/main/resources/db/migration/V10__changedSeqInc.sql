@@ -1,0 +1,1 @@
+ALTER SEQUENCE "logging-platform".logs_seq RESTART WITH 50;

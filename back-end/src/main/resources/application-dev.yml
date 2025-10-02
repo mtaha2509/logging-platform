@@ -1,0 +1,18 @@
+# ========================================
+# DEVELOPMENT ENVIRONMENT CONFIGURATION
+# ========================================
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        "default_schema": ${DB_SCHEMA:logging-platform}
+        jdbc:
+          "batch_size": ${JPA_BATCH_SIZE:100}
+        "order_inserts": true
+        "order_updates": true
+        "format_sql": ${JPA_FORMAT_SQL:false}
+    "show-sql": ${JPA_SHOW_SQL:true}
+

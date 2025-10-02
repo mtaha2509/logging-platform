@@ -1,0 +1,21 @@
+# Java / Spring Boot
+target/
+*.class
+*.jar
+*.war
+*.iml
+/.idea
+/.mvn
+
+# Node.js / OJET frontend
+node_modules/
+dist/
+build/
+.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
